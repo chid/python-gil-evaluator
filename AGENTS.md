@@ -1,20 +1,22 @@
 # AGENTS Guide
 
-This repository evaluates Python library behavior under GIL and free-threaded runtime targets.
+This repository evaluates Python library behavior under GIL and free-threaded runtimes.
 
 ## Objectives
 
 - Produce repeatable compatibility evidence.
-- Keep scenario logic deterministic and debuggable.
-- Surface failures with machine-readable and human-readable outputs.
+- Detect critical failures, flaky behavior, and deadlock risk.
+- Track historical regressions over time.
 
 ## Architecture Map
 
-- `src/gil_evaluator/adapters.py`: library adapters and built-in test batteries.
-- `src/gil_evaluator/runner.py`: scenario execution with timeout handling.
-- `src/gil_evaluator/scoring.py`: verdict policy and regression thresholds.
+- `src/gil_evaluator/adapters.py`: library adapters and built-in batteries.
+- `src/gil_evaluator/runner.py`: scenario execution with retries + timeout handling.
+- `src/gil_evaluator/runtime_worker.py`: single-runtime worker entrypoint.
+- `src/gil_evaluator/subprocess_runner.py`: runtime-to-interpreter subprocess orchestration.
+- `src/gil_evaluator/scoring.py`: tier policy + confidence/flaky/deadlock heuristics.
+- `src/gil_evaluator/history.py`: snapshot append + historical regression comparison.
 - `src/gil_evaluator/reporting.py`: CLI summary and JSON report writing.
-- `tests/`: unit tests for scoring and runtime behavior.
 
 ## Core Commands
 
@@ -22,43 +24,39 @@ This repository evaluates Python library behavior under GIL and free-threaded ru
 uv sync --extra dev
 uv run pytest
 uv run gil-eval --json-out artifacts/gil_eval_report.json
-uv run gil-eval --libraries numpy,pandas
+uv run gil-eval --runtime-exec py312=python3.12,py313t=python3.13t
+uv run pre-commit install
+uv run pre-commit run --all-files
 ```
 
-Optional dependency groups:
+Optional stacks:
 
 ```bash
 uv sync --extra scientific
 uv sync --extra web
+uv sync --extra infra
 uv sync --extra all
 ```
 
-## Agent Operating Rules
+## Operating Rules
 
-- Never silently ignore missing dependencies; report `SKIPPED` with reason.
-- Maintain stable `scenario_id` names to protect report consumers.
-- Keep threshold-based policies centralized in `scoring.py`.
-- Do not introduce non-deterministic tests (no random without fixed seed).
-- Prefer adapter-specific cases over hardcoded behavior in runner/scoring.
+- Never silently ignore missing dependencies; use `SKIPPED` with reason.
+- Keep `scenario_id` stable to preserve report compatibility.
+- Keep tier logic and heuristics centralized in `scoring.py`.
+- Keep history comparison behavior centralized in `history.py`.
+- Avoid non-deterministic tests unless explicitly controlled.
 
-## Adding a New Library Adapter
+## Adding New Adapters
 
-1. Add adapter class in `adapters.py` with full contract methods.
-2. Add at least one functional case and one stress or perf case.
+1. Implement adapter contract methods in `adapters.py`.
+2. Include at least one functional and one stress/perf scenario.
 3. Register adapter in `default_adapters()`.
-4. Add or update tests validating expected statuses/verdict behavior.
-5. Update README if new optional dependency group is introduced.
+4. Add tests for runner + scoring behavior.
+5. Update README and optional dependency groups if needed.
 
-## Report Quality Requirements
+## Quality Requirements
 
-- Required result fields: `library`, `scenario_id`, `runtime`, `status`, `duration_ms`.
-- Required verdict fields: `compatibility_tier`, `failure_count`, `crash_count`.
-- Error fields must be set for non-success statuses.
-- JSON report must remain parseable and stable for CI consumers.
-
-## Failure Handling
-
-- Use `TIMEOUT` when scenario exceeds configured limit.
-- Use `ERROR` for raised exceptions.
-- Use `SKIPPED` only for clear non-execution reasons (e.g., missing dependency).
-- Any critical error in `py313t` must drive `Incompatible` verdict.
+- Scenario records must include runtime, status, duration, and metadata.
+- Non-success statuses must include `error_type` and diagnostic message.
+- Verdict records must include compatibility tier + heuristic metrics.
+- JSON reports must remain stable and machine-readable for CI.

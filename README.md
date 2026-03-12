@@ -1,19 +1,25 @@
 # Python GIL Evaluator
 
-`python-gil-evaluator` is a framework for testing whether Python libraries behave correctly under a traditional GIL runtime and a free-threaded runtime.
+`python-gil-evaluator` tests library behavior across traditional GIL and free-threaded Python runtimes.
 
-It provides:
-- A reusable adapter-based evaluation framework.
+It includes:
+- Adapter-based scenario framework.
 - Functional, stress, and performance scenarios.
-- Tiered verdicts (`Compatible`, `Warning`, `Incompatible`).
-- CLI output plus machine-readable JSON reports.
+- Tiered verdicts: `Compatible`, `Warning`, `Incompatible`.
+- Flaky/deadlock-oriented heuristics and confidence scoring.
+- CLI summary plus JSON artifact output.
+- Baseline history tracking with automatic regression detection.
 
 ## Runtime Targets
 
 - `py312` (baseline GIL runtime)
-- `py313t` (free-threaded runtime label)
+- `py313t` (free-threaded runtime)
 
-The default run compares both labels. For real-world validation, execute under actual Python interpreters for each label in CI.
+By default, runtime labels map to executables:
+- `py312 -> python3.12`
+- `py313t -> python3.13t`
+
+Override mappings with `--runtime-exec`.
 
 ## Quick Start
 
@@ -22,65 +28,93 @@ uv sync --extra dev
 uv run gil-eval --json-out artifacts/gil_eval_report.json
 ```
 
-Run only selected libraries:
+Run selected libraries:
 
 ```bash
-uv run gil-eval --libraries numpy,pandas
+uv run gil-eval --libraries numpy,pandas,orjson
 ```
 
-Set custom policy/limits:
+Pin runtime executables:
 
 ```bash
-uv run gil-eval --perf-threshold 20 --timeout-sec 10 --repeat-perf 5
+uv run gil-eval --runtime-exec py312=/usr/bin/python3.12,py313t=/opt/python3.13t/bin/python
 ```
 
-## Dependency Groups
+Disable history tracking for a one-off run:
 
-Install optional stacks as needed:
+```bash
+uv run gil-eval --disable-history
+```
+
+Debug with in-process runtime execution:
+
+```bash
+uv run gil-eval --in-process
+```
+
+## Built-in Adapters
+
+- `threading_baseline`
+- `numpy`
+- `pandas`
+- `httpx`
+- `sqlalchemy`
+- `orjson`
+- `pydantic`
+- `polars`
+- `fastapi`
+- `redis`
+- `grpcio`
+
+Missing dependencies are reported as `SKIPPED` with reason `dependency_missing`.
+
+## Optional Dependency Groups
 
 ```bash
 uv sync --extra scientific
 uv sync --extra web
+uv sync --extra infra
 uv sync --extra all
 ```
 
-If a library dependency is missing, scenarios are marked `SKIPPED` with reason `dependency_missing`.
+## Verdict and Heuristics
 
-## Verdict Rules
+- `Incompatible`: critical failures in `py313t` (`ERROR`, `TIMEOUT`, `FAILURE`).
+- `Warning`: no critical failures, but performance regression `>= threshold` (default `20%`).
+- `Compatible`: no critical failures and no major perf regression.
 
-- `Incompatible`: any critical failure in `py313t` (errors/timeouts/failures).
-- `Warning`: no critical failures, but max perf slowdown is `>= threshold` (default `20%`).
-- `Compatible`: no critical failures and no major regression.
+Additional signals:
+- `flaky_case_count`: scenarios with mixed outcomes across retries.
+- `timeout_count`: timeout/deadlock risk indicator.
+- `confidence_score`: 0.0-1.0 reliability score derived from failures/flaky outcomes.
 
-## JSON Report Shape
+## History Tracking
 
-Each scenario result includes:
-- `library`
-- `scenario_id`
-- `runtime`
-- `status`
-- `duration_ms`
-- `error_type`
-- `error_message`
-- `metadata`
+Each run can compare with the previous snapshot in `artifacts/history.json`.
+Regression detection flags:
+- compatibility tier worsening
+- performance regression delta increase (>= 10 percentage points)
 
-Each library verdict includes:
-- `compatibility_tier`
-- `failure_count`
-- `crash_count`
-- `perf_regression_pct`
-- `notes`
+## Pre-commit
+
+Install hooks:
+
+```bash
+uv run pre-commit install
+```
+
+Run all hooks:
+
+```bash
+uv run pre-commit run --all-files
+```
 
 ## Extending the Framework
 
-1. Implement a new adapter in `src/gil_evaluator/adapters.py` with:
-   - `import_check()`
-   - `functional_cases()`
-   - `stress_cases()`
-   - `perf_cases()`
+1. Add a new adapter in `src/gil_evaluator/adapters.py`.
 2. Return `Case` objects with stable `case_id` values.
-3. Add adapter to `default_adapters()`.
-4. Add unit/integration tests.
+3. Register adapter in `default_adapters()`.
+4. Add tests for runner/scoring/history impacts.
 
 ## Project Docs
 

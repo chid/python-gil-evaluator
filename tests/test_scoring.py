@@ -28,6 +28,7 @@ def test_scoring_marks_incompatible_on_critical_failure() -> None:
     assert verdict.compatibility_tier == CompatibilityTier.INCOMPATIBLE
     assert verdict.failure_count == 1
     assert verdict.crash_count == 1
+    assert verdict.confidence_score == 0.0
 
 
 def test_scoring_marks_warning_on_perf_threshold() -> None:
@@ -77,3 +78,4 @@ def test_scoring_marks_compatible_when_no_critical_or_perf_issue() -> None:
 
     verdict = score_results(results, perf_threshold_pct=20.0)[0]
     assert verdict.compatibility_tier == CompatibilityTier.COMPATIBLE
+    assert verdict.confidence_score == 1.0

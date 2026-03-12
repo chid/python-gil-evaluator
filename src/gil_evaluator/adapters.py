@@ -176,8 +176,7 @@ class SqlalchemyAdapter(BaseAdapter):
 
     def functional_cases(self) -> list[Case]:
         def in_memory_query() -> dict[str, int]:
-            from sqlalchemy import text
-            from sqlalchemy import create_engine
+            from sqlalchemy import create_engine, text
 
             engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
             with engine.connect() as connection:
@@ -188,8 +187,7 @@ class SqlalchemyAdapter(BaseAdapter):
 
     def stress_cases(self) -> list[Case]:
         def threaded_select() -> dict[str, int]:
-            from sqlalchemy import text
-            from sqlalchemy import create_engine
+            from sqlalchemy import create_engine, text
 
             values: list[int] = []
             lock = Lock()
@@ -209,6 +207,291 @@ class SqlalchemyAdapter(BaseAdapter):
             return {"count": len(values), "sum": sum(values)}
 
         return [Case("sqlalchemy.threaded_select", CaseType.STRESS, threaded_select)]
+
+
+class OrjsonAdapter(BaseAdapter):
+    def __init__(self) -> None:
+        super().__init__(name="orjson", import_name="orjson")
+
+    def functional_cases(self) -> list[Case]:
+        def dumps_loads_roundtrip() -> dict[str, int]:
+            import orjson
+
+            payload = {"a": 1, "b": [1, 2, 3]}
+            raw = orjson.dumps(payload)
+            decoded = orjson.loads(raw)
+            return {"keys": len(decoded.keys())}
+
+        return [Case("orjson.roundtrip", CaseType.FUNCTIONAL, dumps_loads_roundtrip)]
+
+    def stress_cases(self) -> list[Case]:
+        def threaded_dumps() -> dict[str, int]:
+            import orjson
+
+            done = 0
+            lock = Lock()
+
+            def worker(seed: int) -> None:
+                nonlocal done
+                _ = orjson.dumps({"seed": seed, "values": list(range(20))})
+                with lock:
+                    done += 1
+
+            threads = [Thread(target=worker, args=(idx,)) for idx in range(16)]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join()
+            return {"done": done}
+
+        return [Case("orjson.threaded_dumps", CaseType.STRESS, threaded_dumps)]
+
+    def perf_cases(self) -> list[Case]:
+        def encode_batch() -> dict[str, int]:
+            import orjson
+
+            payload = [{"id": idx, "name": f"user-{idx}"} for idx in range(1500)]
+            raw = orjson.dumps(payload)
+            return {"bytes": len(raw)}
+
+        return [Case("orjson.encode_batch", CaseType.PERF, encode_batch)]
+
+
+class PydanticAdapter(BaseAdapter):
+    def __init__(self) -> None:
+        super().__init__(name="pydantic", import_name="pydantic")
+
+    def functional_cases(self) -> list[Case]:
+        def model_validation() -> dict[str, int]:
+            from pydantic import BaseModel
+
+            class User(BaseModel):
+                id: int
+                name: str
+
+            user = User(id=7, name="alice")
+            return {"id": user.id}
+
+        return [Case("pydantic.model_validation", CaseType.FUNCTIONAL, model_validation)]
+
+    def stress_cases(self) -> list[Case]:
+        def threaded_validation() -> dict[str, int]:
+            from pydantic import BaseModel
+
+            class Item(BaseModel):
+                sku: str
+                quantity: int
+
+            valid = 0
+            lock = Lock()
+
+            def worker(seed: int) -> None:
+                nonlocal valid
+                _ = Item(sku=f"SKU-{seed}", quantity=seed)
+                with lock:
+                    valid += 1
+
+            threads = [Thread(target=worker, args=(idx,)) for idx in range(20)]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join()
+            return {"valid": valid}
+
+        return [Case("pydantic.threaded_validation", CaseType.STRESS, threaded_validation)]
+
+    def perf_cases(self) -> list[Case]:
+        def bulk_validate() -> dict[str, int]:
+            from pydantic import BaseModel
+
+            class Record(BaseModel):
+                value: int
+                tag: str
+
+            count = 0
+            for idx in range(2000):
+                _ = Record(value=idx, tag=f"tag-{idx}")
+                count += 1
+            return {"count": count}
+
+        return [Case("pydantic.bulk_validate", CaseType.PERF, bulk_validate)]
+
+
+class PolarsAdapter(BaseAdapter):
+    def __init__(self) -> None:
+        super().__init__(name="polars", import_name="polars")
+
+    def functional_cases(self) -> list[Case]:
+        def eager_transform() -> dict[str, int]:
+            import polars as pl
+
+            frame = pl.DataFrame({"a": [1, 2, 3], "b": [4, 5, 6]})
+            out = frame.with_columns((pl.col("a") + pl.col("b")).alias("c"))
+            return {"sum": int(out["c"].sum())}
+
+        return [Case("polars.eager_transform", CaseType.FUNCTIONAL, eager_transform)]
+
+    def stress_cases(self) -> list[Case]:
+        def threaded_select() -> dict[str, int]:
+            import polars as pl
+
+            outputs: list[int] = []
+            lock = Lock()
+
+            def worker(seed: int) -> None:
+                frame = pl.DataFrame({"n": [seed, seed + 1, seed + 2]})
+                total = int(frame.select(pl.sum("n")).item())
+                with lock:
+                    outputs.append(total)
+
+            threads = [Thread(target=worker, args=(idx,)) for idx in range(12)]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join()
+            return {"count": len(outputs), "checksum": sum(outputs)}
+
+        return [Case("polars.threaded_select", CaseType.STRESS, threaded_select)]
+
+    def perf_cases(self) -> list[Case]:
+        def lazy_groupby() -> dict[str, int]:
+            import polars as pl
+
+            frame = pl.DataFrame(
+                {"k": [idx % 10 for idx in range(15_000)], "v": list(range(15_000))}
+            )
+            out = frame.lazy().group_by("k").agg(pl.sum("v")).collect()
+            return {"rows": out.height}
+
+        return [Case("polars.lazy_groupby", CaseType.PERF, lazy_groupby)]
+
+
+class FastapiAdapter(BaseAdapter):
+    def __init__(self) -> None:
+        super().__init__(name="fastapi", import_name="fastapi")
+
+    def functional_cases(self) -> list[Case]:
+        def app_smoke() -> dict[str, int]:
+            from fastapi import FastAPI
+            from fastapi.testclient import TestClient
+
+            app = FastAPI()
+
+            @app.get("/health")
+            def health() -> dict[str, str]:
+                return {"status": "ok"}
+
+            with TestClient(app) as client:
+                response = client.get("/health")
+            return {"status_code": response.status_code}
+
+        return [Case("fastapi.app_smoke", CaseType.FUNCTIONAL, app_smoke)]
+
+    def stress_cases(self) -> list[Case]:
+        def threaded_testclient() -> dict[str, int]:
+            from fastapi import FastAPI
+            from fastapi.testclient import TestClient
+
+            app = FastAPI()
+
+            @app.get("/v")
+            def value() -> dict[str, int]:
+                return {"v": 1}
+
+            ok = 0
+            lock = Lock()
+
+            def worker() -> None:
+                nonlocal ok
+                with TestClient(app) as client:
+                    response = client.get("/v")
+                with lock:
+                    ok += int(response.status_code == 200)
+
+            threads = [Thread(target=worker) for _ in range(8)]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join()
+            return {"ok": ok}
+
+        return [Case("fastapi.threaded_testclient", CaseType.STRESS, threaded_testclient)]
+
+
+class RedisAdapter(BaseAdapter):
+    def __init__(self) -> None:
+        super().__init__(name="redis", import_name="redis")
+
+    def functional_cases(self) -> list[Case]:
+        def client_build() -> dict[str, int]:
+            from redis import Redis
+
+            client = Redis.from_url("redis://localhost:6379/0")
+            encoded = client.get_encoder().encode("ping")
+            return {"encoded_len": len(encoded)}
+
+        return [Case("redis.client_build", CaseType.FUNCTIONAL, client_build)]
+
+    def stress_cases(self) -> list[Case]:
+        def threaded_encoder() -> dict[str, int]:
+            from redis import Redis
+
+            done = 0
+            lock = Lock()
+            client = Redis.from_url("redis://localhost:6379/0")
+
+            def worker(seed: int) -> None:
+                nonlocal done
+                _ = client.get_encoder().encode(f"v-{seed}")
+                with lock:
+                    done += 1
+
+            threads = [Thread(target=worker, args=(idx,)) for idx in range(20)]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join()
+            return {"done": done}
+
+        return [Case("redis.threaded_encoder", CaseType.STRESS, threaded_encoder)]
+
+
+class GrpcioAdapter(BaseAdapter):
+    def __init__(self) -> None:
+        super().__init__(name="grpcio", import_name="grpc")
+
+    def functional_cases(self) -> list[Case]:
+        def channel_build() -> dict[str, int]:
+            import grpc
+
+            channel = grpc.insecure_channel("localhost:50051")
+            channel.close()
+            return {"ok": 1}
+
+        return [Case("grpcio.channel_build", CaseType.FUNCTIONAL, channel_build)]
+
+    def stress_cases(self) -> list[Case]:
+        def threaded_channels() -> dict[str, int]:
+            import grpc
+
+            done = 0
+            lock = Lock()
+
+            def worker(seed: int) -> None:
+                nonlocal done
+                channel = grpc.insecure_channel(f"localhost:{50051 + seed}")
+                channel.close()
+                with lock:
+                    done += 1
+
+            threads = [Thread(target=worker, args=(idx,)) for idx in range(12)]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join()
+            return {"done": done}
+
+        return [Case("grpcio.threaded_channels", CaseType.STRESS, threaded_channels)]
 
 
 class ThreadingBaselineAdapter(BaseAdapter):
@@ -282,4 +565,10 @@ def default_adapters() -> list[LibraryAdapter]:
         PandasAdapter(),
         HttpxAdapter(),
         SqlalchemyAdapter(),
+        OrjsonAdapter(),
+        PydanticAdapter(),
+        PolarsAdapter(),
+        FastapiAdapter(),
+        RedisAdapter(),
+        GrpcioAdapter(),
     ]

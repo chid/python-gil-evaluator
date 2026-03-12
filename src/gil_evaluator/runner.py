@@ -14,9 +14,12 @@ class RunnerConfig:
     runtime: str
     timeout_sec: float = 5.0
     repeat_perf: int = 3
+    repeat_non_perf: int = 2
 
 
-def _execute_case(case: Case, timeout_sec: float) -> tuple[ScenarioStatus, float, dict, str | None, str | None]:
+def _execute_case(
+    case: Case, timeout_sec: float
+) -> tuple[ScenarioStatus, float, dict, str | None, str | None]:
     start = time.perf_counter()
     try:
         with ThreadPoolExecutor(max_workers=1) as pool:
@@ -63,17 +66,43 @@ def run_runtime(
 
         all_cases = adapter.functional_cases() + adapter.stress_cases()
         for case in all_cases:
-            status, elapsed_ms, metadata, err_type, err_msg = _execute_case(case, config.timeout_sec)
+            durations: list[float] = []
+            attempt_statuses: list[str] = []
+            metadata: dict = {}
+            err_type = None
+            err_msg = None
+            status = ScenarioStatus.SUCCESS
+            for _ in range(config.repeat_non_perf):
+                run_status, elapsed_ms, run_metadata, run_err_type, run_err_msg = _execute_case(
+                    case, config.timeout_sec
+                )
+                attempt_statuses.append(run_status.value)
+                durations.append(elapsed_ms)
+                if run_status is not ScenarioStatus.SUCCESS:
+                    status = run_status
+                    err_type = run_err_type
+                    err_msg = run_err_msg
+                    metadata = run_metadata
+                    break
+                metadata = run_metadata
+
+            unique_attempts = set(attempt_statuses)
             results.append(
                 ScenarioResult(
                     library=adapter.name,
                     scenario_id=case.case_id,
                     runtime=config.runtime,
                     status=status,
-                    duration_ms=elapsed_ms,
+                    duration_ms=(sum(durations) / len(durations)) if durations else 0.0,
                     error_type=err_type,
                     error_message=err_msg,
-                    metadata={**metadata, "case_type": case.case_type.value},
+                    metadata={
+                        **metadata,
+                        "case_type": case.case_type.value,
+                        "repeat_count": config.repeat_non_perf,
+                        "attempt_statuses": attempt_statuses,
+                        "flaky": len(unique_attempts) > 1,
+                    },
                 )
             )
 

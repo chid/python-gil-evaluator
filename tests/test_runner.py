@@ -35,6 +35,31 @@ class TinyAdapter:
         return [Case("tiny.perf", CaseType.PERF, lambda: {"ok": 1})]
 
 
+class FlakyAdapter:
+    name = "flaky"
+
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def import_check(self) -> tuple[bool, str | None]:
+        return True, None
+
+    def functional_cases(self) -> list[Case]:
+        def maybe_fail() -> dict[str, int]:
+            self.calls += 1
+            if self.calls % 2 == 0:
+                raise RuntimeError("intermittent")
+            return {"ok": 1}
+
+        return [Case("flaky.functional", CaseType.FUNCTIONAL, maybe_fail)]
+
+    def stress_cases(self) -> list[Case]:
+        return []
+
+    def perf_cases(self) -> list[Case]:
+        return []
+
+
 def test_runner_marks_missing_dependency_as_skipped() -> None:
     results = run_runtime(
         config=RunnerConfig(runtime="py313t"),
@@ -56,3 +81,14 @@ def test_runner_executes_all_case_types() -> None:
     assert {result.metadata["case_type"] for result in results} == {"functional", "stress", "perf"}
     perf = [result for result in results if result.metadata["case_type"] == "perf"][0]
     assert len(perf.metadata["sample_ms"]) == 2
+
+
+def test_runner_marks_flaky_attempt_metadata() -> None:
+    results = run_runtime(
+        config=RunnerConfig(runtime="py313t", repeat_non_perf=2),
+        adapters=[FlakyAdapter()],
+    )
+
+    assert len(results) == 1
+    assert results[0].metadata["flaky"] is True
+    assert results[0].metadata["attempt_statuses"] == ["success", "error"]
