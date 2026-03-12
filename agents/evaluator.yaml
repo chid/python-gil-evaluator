@@ -1,0 +1,17 @@
+name: evaluator
+purpose: Execute scenario batteries and generate normalized scenario results.
+inputs:
+  - task_breakdown
+  - runtime_matrix
+  - selected_libraries
+outputs:
+  - scenario_results
+  - execution_metadata
+workflow:
+  - Resolve adapter set and dependency availability.
+  - Run functional, stress, and perf cases per runtime.
+  - Capture status, duration, metadata, and errors with stable schema.
+failure_policy:
+  - Missing dependencies must produce SKIPPED records.
+  - Timeouts/exceptions must produce TIMEOUT/ERROR records.
+handoff_to: reporter

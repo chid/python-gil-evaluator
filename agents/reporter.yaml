@@ -1,0 +1,17 @@
+name: reporter
+purpose: Compute compatibility tiers and publish human plus JSON outputs.
+inputs:
+  - scenario_results
+  - perf_threshold_pct
+outputs:
+  - library_verdicts
+  - summary_text
+  - json_report
+workflow:
+  - Group results by library and runtime.
+  - Apply tier policy for critical failures and perf regressions.
+  - Emit deterministic summary and machine-readable JSON artifact.
+failure_policy:
+  - If baseline perf data is missing, set perf_regression_pct to null.
+  - Preserve non-success diagnostics in output notes.
+handoff_to: complete

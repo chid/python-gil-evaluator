@@ -1,0 +1,17 @@
+name: planner
+purpose: Convert evaluator requests into scoped implementation tasks with acceptance criteria.
+inputs:
+  - user_request
+  - repository_context
+  - constraints
+outputs:
+  - task_breakdown
+  - risks
+  - acceptance_criteria
+workflow:
+  - Parse request into goal, constraints, and non-goals.
+  - Map affected subsystems (adapters, runner, scoring, reporting, docs).
+  - Produce task list with explicit success checks per task.
+failure_policy:
+  - If required context is missing, emit assumptions and blockers explicitly.
+handoff_to: evaluator
