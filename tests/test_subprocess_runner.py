@@ -76,3 +76,26 @@ def test_run_runtime_in_subprocess_handles_failures(monkeypatch: pytest.MonkeyPa
     assert len(results) == 1
     assert results[0].status is ScenarioStatus.ERROR
     assert results[0].error_type == "RuntimeExecutionError"
+
+
+def test_run_runtime_in_subprocess_forwards_plugin_specs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    payload = []
+    seen = {"command": []}
+
+    def fake_run(*args, **_kwargs):
+        seen["command"] = args[0]
+        return CompletedProcess(args=[], returncode=0, stdout=json.dumps(payload), stderr="")
+
+    monkeypatch.setattr("gil_evaluator.subprocess_runner.subprocess.run", fake_run)
+
+    _ = run_runtime_in_subprocess(
+        runtime="py312",
+        executable="python3.12",
+        config=SubprocessConfig(timeout_sec=1.0, repeat_perf=1, repeat_non_perf=2),
+        selected_libraries=None,
+        plugin_specs=["tests.fixtures.plugin_adapter:DemoPluginAdapter"],
+    )
+
+    assert "--plugin" in seen["command"]

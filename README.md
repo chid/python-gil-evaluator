@@ -34,6 +34,12 @@ Run selected libraries:
 uv run gil-eval --libraries numpy,pandas,orjson
 ```
 
+Run the priority top-10 roadmap list:
+
+```bash
+uv run gil-eval --libraries-file configs/priority_libraries.txt
+```
+
 Pin runtime executables:
 
 ```bash
@@ -50,6 +56,12 @@ Debug with in-process runtime execution:
 
 ```bash
 uv run gil-eval --in-process
+```
+
+Load external plugin adapters:
+
+```bash
+uv run gil-eval --plugin your_pkg.gil_plugins:RedisClusterAdapter
 ```
 
 ## Built-in Adapters
@@ -114,10 +126,12 @@ uv run pre-commit run --all-files
 1. Add a new adapter in `src/gil_evaluator/adapters.py`.
 2. Return `Case` objects with stable `case_id` values.
 3. Register adapter in `default_adapters()`.
-4. Add tests for runner/scoring/history impacts.
+4. Or provide external plugins via entry points group `gil_evaluator.adapters` or `--plugin`.
+5. Add tests for runner/scoring/history impacts.
 
 ## Project Docs
 
 - Implementation plan: [`docs/IMPLEMENTATION_PLAN.md`](docs/IMPLEMENTATION_PLAN.md)
+- Priority roadmap: [`docs/PRIORITY_LIBRARY_ROADMAP.md`](docs/PRIORITY_LIBRARY_ROADMAP.md)
 - Contributor/agent workflow rules: [`AGENTS.md`](AGENTS.md)
 - Role-oriented agent configs: [`agents/README.md`](agents/README.md)

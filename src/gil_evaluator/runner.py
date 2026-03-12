@@ -39,8 +39,9 @@ def run_runtime(
     config: RunnerConfig,
     selected_libraries: set[str] | None = None,
     adapters: list[LibraryAdapter] | None = None,
+    plugin_adapters: list[LibraryAdapter] | None = None,
 ) -> list[ScenarioResult]:
-    chosen_adapters = adapters or default_adapters()
+    chosen_adapters = (adapters or default_adapters()) + (plugin_adapters or [])
     results: list[ScenarioResult] = []
 
     for adapter in chosen_adapters:

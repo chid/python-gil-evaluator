@@ -1,0 +1,11 @@
+# Priority v1 libraries (top 10)
+numpy
+pandas
+sqlalchemy
+httpx
+pydantic
+fastapi
+polars
+redis
+grpcio
+orjson

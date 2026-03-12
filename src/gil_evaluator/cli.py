@@ -5,6 +5,7 @@ from pathlib import Path
 
 from .history import append_history, compare_with_latest
 from .models import Report
+from .plugins import load_plugin_adapters
 from .reporting import render_summary, write_report_json
 from .runner import RunnerConfig, run_runtime
 from .scoring import score_results
@@ -44,6 +45,18 @@ def build_parser() -> argparse.ArgumentParser:
         default="",
         help="Comma-separated library names to include (default: all known adapters).",
     )
+    parser.add_argument(
+        "--libraries-file",
+        type=Path,
+        default=None,
+        help="Path to newline-delimited library names. Merged with --libraries.",
+    )
+    parser.add_argument(
+        "--plugin",
+        action="append",
+        default=[],
+        help="Plugin adapter spec module.path:AdapterClassOrFactory. Can be repeated.",
+    )
     parser.add_argument("--perf-threshold", type=float, default=20.0)
     parser.add_argument("--timeout-sec", type=float, default=5.0)
     parser.add_argument("--repeat-perf", type=int, default=3)
@@ -66,7 +79,16 @@ def main() -> None:
     args = parser.parse_args()
 
     runtimes = [item.strip() for item in args.runtimes.split(",") if item.strip()]
-    selected = {item.strip() for item in args.libraries.split(",") if item.strip()} or None
+    selected = {item.strip() for item in args.libraries.split(",") if item.strip()}
+    if args.libraries_file:
+        lines = args.libraries_file.read_text(encoding="utf-8").splitlines()
+        selected.update(
+            item.strip()
+            for item in lines
+            if item.strip() and not item.strip().startswith("#")
+        )
+    selected_libraries = selected or None
+    plugin_adapters = load_plugin_adapters(args.plugin)
     runtime_overrides = parse_runtime_exec_map(args.runtime_exec)
 
     all_results = []
@@ -78,7 +100,13 @@ def main() -> None:
                 repeat_perf=args.repeat_perf,
                 repeat_non_perf=args.repeat_non_perf,
             )
-            all_results.extend(run_runtime(config=config, selected_libraries=selected))
+            all_results.extend(
+                run_runtime(
+                    config=config,
+                    selected_libraries=selected_libraries,
+                    plugin_adapters=plugin_adapters,
+                )
+            )
             continue
 
         executable = resolve_runtime_executable(runtime, runtime_overrides)
@@ -91,7 +119,8 @@ def main() -> None:
                     repeat_perf=args.repeat_perf,
                     repeat_non_perf=args.repeat_non_perf,
                 ),
-                selected_libraries=selected,
+                selected_libraries=selected_libraries,
+                plugin_specs=args.plugin,
             )
         )
 

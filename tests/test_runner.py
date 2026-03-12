@@ -92,3 +92,14 @@ def test_runner_marks_flaky_attempt_metadata() -> None:
     assert len(results) == 1
     assert results[0].metadata["flaky"] is True
     assert results[0].metadata["attempt_statuses"] == ["success", "error"]
+
+
+def test_runner_includes_plugin_adapters() -> None:
+    results = run_runtime(
+        config=RunnerConfig(runtime="py312"),
+        selected_libraries={"tiny"},
+        adapters=[],
+        plugin_adapters=[TinyAdapter()],
+    )
+    assert results
+    assert {item.library for item in results} == {"tiny"}

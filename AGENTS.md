@@ -14,6 +14,7 @@ This repository evaluates Python library behavior under GIL and free-threaded ru
 - `src/gil_evaluator/runner.py`: scenario execution with retries + timeout handling.
 - `src/gil_evaluator/runtime_worker.py`: single-runtime worker entrypoint.
 - `src/gil_evaluator/subprocess_runner.py`: runtime-to-interpreter subprocess orchestration.
+- `src/gil_evaluator/plugins.py`: external adapter plugin loading.
 - `src/gil_evaluator/scoring.py`: tier policy + confidence/flaky/deadlock heuristics.
 - `src/gil_evaluator/history.py`: snapshot append + historical regression comparison.
 - `src/gil_evaluator/reporting.py`: CLI summary and JSON report writing.
@@ -25,6 +26,8 @@ uv sync --extra dev
 uv run pytest
 uv run gil-eval --json-out artifacts/gil_eval_report.json
 uv run gil-eval --runtime-exec py312=python3.12,py313t=python3.13t
+uv run gil-eval --libraries-file configs/priority_libraries.txt
+uv run gil-eval --plugin your_pkg.gil_plugins:CustomAdapter
 uv run pre-commit install
 uv run pre-commit run --all-files
 ```
@@ -44,6 +47,7 @@ uv sync --extra all
 - Keep `scenario_id` stable to preserve report compatibility.
 - Keep tier logic and heuristics centralized in `scoring.py`.
 - Keep history comparison behavior centralized in `history.py`.
+- Prefer plugin adapters for external repos rather than forking core adapters.
 - Avoid non-deterministic tests unless explicitly controlled.
 
 ## Adding New Adapters

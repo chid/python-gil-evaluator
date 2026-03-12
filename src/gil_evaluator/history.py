@@ -8,7 +8,6 @@ from typing import Any
 
 from .models import CompatibilityTier, LibraryVerdict
 
-
 TIER_RANK = {
     CompatibilityTier.COMPATIBLE.value: 0,
     CompatibilityTier.WARNING.value: 1,

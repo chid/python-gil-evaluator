@@ -33,6 +33,37 @@ def render_summary(report: Report) -> str:
     return "\n".join(lines)
 
 
+def render_markdown_summary(report: Report) -> str:
+    lines: list[str] = []
+    lines.append("## GIL Compatibility Summary")
+    lines.append("")
+    lines.append(f"- Runtimes: `{', '.join(report.runtimes)}`")
+    lines.append(f"- Perf warning threshold: `{report.perf_threshold_pct:.2f}%`")
+    lines.append("")
+    lines.append(
+        "| Library | Tier | Failures | Crashes | Flaky | Timeouts | Confidence | Perf Regression |"
+    )
+    lines.append("|---|---:|---:|---:|---:|---:|---:|---:|")
+    for verdict in sorted(report.verdicts, key=lambda item: item.library):
+        perf = (
+            f"{verdict.perf_regression_pct:.2f}%"
+            if verdict.perf_regression_pct is not None
+            else "n/a"
+        )
+        lines.append(
+            f"| `{verdict.library}` | {verdict.compatibility_tier.value} | "
+            f"{verdict.failure_count} | {verdict.crash_count} | "
+            f"{verdict.flaky_case_count} | {verdict.timeout_count} | "
+            f"{verdict.confidence_score:.3f} | {perf} |"
+        )
+    if report.history_regressions:
+        lines.append("")
+        lines.append("### History Regressions")
+        for reg in report.history_regressions:
+            lines.append(f"- `{reg}`")
+    return "\n".join(lines)
+
+
 def _tier_icon(tier: CompatibilityTier) -> str:
     if tier is CompatibilityTier.COMPATIBLE:
         return "PASS"

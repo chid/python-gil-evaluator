@@ -6,7 +6,6 @@ from dataclasses import dataclass
 
 from .models import ScenarioResult, ScenarioStatus
 
-
 DEFAULT_RUNTIME_EXECUTABLES = {
     "py312": "python3.12",
     "py313t": "python3.13t",
@@ -55,6 +54,7 @@ def run_runtime_in_subprocess(
     executable: str,
     config: SubprocessConfig,
     selected_libraries: set[str] | None,
+    plugin_specs: list[str] | None = None,
 ) -> list[ScenarioResult]:
     command = [
         executable,
@@ -72,6 +72,8 @@ def run_runtime_in_subprocess(
 
     if selected_libraries:
         command.extend(["--libraries", ",".join(sorted(selected_libraries))])
+    for spec in plugin_specs or []:
+        command.extend(["--plugin", spec])
 
     completed = subprocess.run(command, check=False, capture_output=True, text=True)
     if completed.returncode != 0:
