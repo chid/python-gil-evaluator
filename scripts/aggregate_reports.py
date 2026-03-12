@@ -15,7 +15,9 @@ def _load_results(path: Path) -> list[ScenarioResult]:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Aggregate runtime reports into one combined report.")
+    parser = argparse.ArgumentParser(
+        description="Aggregate runtime reports into one combined report."
+    )
     parser.add_argument("--inputs", required=True, help="Comma-separated report JSON file paths.")
     parser.add_argument("--json-out", required=True, type=Path)
     parser.add_argument("--markdown-out", required=True, type=Path)

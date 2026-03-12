@@ -95,7 +95,7 @@ def test_run_runtime_in_subprocess_forwards_plugin_specs(
         executable="python3.12",
         config=SubprocessConfig(timeout_sec=1.0, repeat_perf=1, repeat_non_perf=2),
         selected_libraries=None,
-        plugin_specs=["tests.fixtures.plugin_adapter:DemoPluginAdapter"],
+        plugin_specs=["gil_evaluator.examples.plugin_adapter:DemoPluginAdapter"],
     )
 
     assert "--plugin" in seen["command"]

@@ -64,6 +64,27 @@ Load external plugin adapters:
 uv run gil-eval --plugin your_pkg.gil_plugins:RedisClusterAdapter
 ```
 
+Validate plugin contracts without running scenarios:
+
+```bash
+uv run gil-eval --plugin your_pkg.gil_plugins:RedisClusterAdapter --validate-plugins
+```
+
+Run by curated profile:
+
+```bash
+uv run gil-eval --profile data
+uv run gil-eval --profile web
+uv run gil-eval --profile infra
+uv run gil-eval --profile priority
+```
+
+Compare against a previous report and include trend metrics:
+
+```bash
+uv run gil-eval --compare-with artifacts/previous_report.json --trend-window 10
+```
+
 ## Built-in Adapters
 
 - `threading_baseline`
@@ -99,6 +120,9 @@ Additional signals:
 - `flaky_case_count`: scenarios with mixed outcomes across retries.
 - `timeout_count`: timeout/deadlock risk indicator.
 - `confidence_score`: 0.0-1.0 reliability score derived from failures/flaky outcomes.
+- `adapter_metadata`: domain/risk/workload metadata for each library.
+- `regression_deltas`: explicit diff against `--compare-with` report.
+- `trend_metrics`: rolling summary from recent history snapshots.
 
 ## History Tracking
 

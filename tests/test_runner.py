@@ -69,6 +69,7 @@ def test_runner_marks_missing_dependency_as_skipped() -> None:
     assert len(results) == 1
     assert results[0].status == ScenarioStatus.SKIPPED
     assert results[0].metadata["reason"] == "dependency_missing"
+    assert "uv sync --extra" in results[0].metadata["install_hint"]
 
 
 def test_runner_executes_all_case_types() -> None:
@@ -79,6 +80,7 @@ def test_runner_executes_all_case_types() -> None:
 
     assert len(results) == 3
     assert {result.metadata["case_type"] for result in results} == {"functional", "stress", "perf"}
+    assert all("adapter_metadata" in result.metadata for result in results)
     perf = [result for result in results if result.metadata["case_type"] == "perf"][0]
     assert len(perf.metadata["sample_ms"]) == 2
 

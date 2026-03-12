@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from importlib import import_module
 from threading import Lock, Thread
-from typing import Protocol
+from typing import Any, Protocol
 
 from .cases import Case, CaseType
 
@@ -18,6 +18,8 @@ class LibraryAdapter(Protocol):
     def stress_cases(self) -> list[Case]: ...
 
     def perf_cases(self) -> list[Case]: ...
+
+    def metadata(self) -> dict[str, Any]: ...
 
 
 @dataclass(slots=True)
@@ -40,6 +42,58 @@ class BaseAdapter:
 
     def perf_cases(self) -> list[Case]:
         return []
+
+    def metadata(self) -> dict[str, Any]:
+        return adapter_metadata_for_library(self.name)
+
+
+PROFILE_LIBRARY_MAP: dict[str, set[str]] = {
+    "data": {"numpy", "pandas", "polars"},
+    "web": {"httpx", "sqlalchemy", "fastapi", "pydantic"},
+    "infra": {"redis", "grpcio", "orjson"},
+    "priority": {
+        "numpy",
+        "pandas",
+        "sqlalchemy",
+        "httpx",
+        "pydantic",
+        "fastapi",
+        "polars",
+        "redis",
+        "grpcio",
+        "orjson",
+    },
+}
+
+
+ADAPTER_METADATA_MAP: dict[str, dict[str, Any]] = {
+    "threading_baseline": {
+        "domain": "core",
+        "risk_level": "medium",
+        "workload_class": "cpu_bound",
+    },
+    "numpy": {"domain": "data", "risk_level": "high", "workload_class": "cpu_bound"},
+    "pandas": {"domain": "data", "risk_level": "high", "workload_class": "mixed"},
+    "polars": {"domain": "data", "risk_level": "high", "workload_class": "mixed"},
+    "sqlalchemy": {"domain": "web", "risk_level": "high", "workload_class": "io_bound"},
+    "httpx": {"domain": "web", "risk_level": "medium", "workload_class": "io_bound"},
+    "fastapi": {"domain": "web", "risk_level": "medium", "workload_class": "io_bound"},
+    "pydantic": {"domain": "web", "risk_level": "medium", "workload_class": "cpu_bound"},
+    "redis": {"domain": "infra", "risk_level": "high", "workload_class": "io_bound"},
+    "grpcio": {"domain": "infra", "risk_level": "high", "workload_class": "io_bound"},
+    "orjson": {"domain": "infra", "risk_level": "medium", "workload_class": "cpu_bound"},
+}
+
+
+def libraries_for_profile(profile: str) -> set[str]:
+    return set(PROFILE_LIBRARY_MAP.get(profile, set()))
+
+
+def adapter_metadata_for_library(library: str) -> dict[str, Any]:
+    return ADAPTER_METADATA_MAP.get(
+        library,
+        {"domain": "unknown", "risk_level": "unknown", "workload_class": "unknown"},
+    )
 
 
 class NumpyAdapter(BaseAdapter):

@@ -4,7 +4,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from dataclasses import dataclass
 
-from .adapters import LibraryAdapter, default_adapters
+from .adapters import LibraryAdapter, adapter_metadata_for_library, default_adapters
 from .cases import Case
 from .models import ScenarioResult, ScenarioStatus
 
@@ -47,6 +47,12 @@ def run_runtime(
     for adapter in chosen_adapters:
         if selected_libraries and adapter.name not in selected_libraries:
             continue
+        adapter_metadata = (
+            adapter.metadata()
+            if hasattr(adapter, "metadata") and callable(adapter.metadata)
+            else adapter_metadata_for_library(adapter.name)
+        )
+        install_hint = _install_hint_for_library(adapter.name)
 
         import_ok, import_err = adapter.import_check()
         if not import_ok:
@@ -60,7 +66,11 @@ def run_runtime(
                         duration_ms=0.0,
                         error_type="MissingDependency",
                         error_message=import_err,
-                        metadata={"reason": "dependency_missing"},
+                        metadata={
+                            "reason": "dependency_missing",
+                            "install_hint": install_hint,
+                            "adapter_metadata": adapter_metadata,
+                        },
                     )
                 )
             continue
@@ -99,6 +109,7 @@ def run_runtime(
                     error_message=err_msg,
                     metadata={
                         **metadata,
+                        "adapter_metadata": adapter_metadata,
                         "case_type": case.case_type.value,
                         "repeat_count": config.repeat_non_perf,
                         "attempt_statuses": attempt_statuses,
@@ -138,6 +149,7 @@ def run_runtime(
                     error_message=err_msg,
                     metadata={
                         **meta,
+                        "adapter_metadata": adapter_metadata,
                         "case_type": case.case_type.value,
                         "repeat_count": config.repeat_perf,
                         "sample_ms": durations,
@@ -146,3 +158,13 @@ def run_runtime(
             )
 
     return results
+
+
+def _install_hint_for_library(library: str) -> str:
+    if library in {"numpy", "pandas", "polars"}:
+        return "uv sync --extra scientific"
+    if library in {"httpx", "sqlalchemy", "fastapi", "pydantic"}:
+        return "uv sync --extra web"
+    if library in {"redis", "grpcio", "orjson"}:
+        return "uv sync --extra infra"
+    return "uv sync --extra all"

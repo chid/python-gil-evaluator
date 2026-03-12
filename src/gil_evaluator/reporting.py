@@ -15,6 +15,8 @@ def render_summary(report: Report) -> str:
     lines: list[str] = []
     lines.append("GIL Compatibility Evaluation")
     lines.append(f"Runtimes: {', '.join(report.runtimes)}")
+    if report.profile:
+        lines.append(f"Profile: {report.profile}")
     lines.append(f"Performance warning threshold: {report.perf_threshold_pct:.2f}%")
     lines.append("")
 
@@ -60,6 +62,11 @@ def render_markdown_summary(report: Report) -> str:
         lines.append("")
         lines.append("### History Regressions")
         for reg in report.history_regressions:
+            lines.append(f"- `{reg}`")
+    if report.regression_deltas:
+        lines.append("")
+        lines.append("### Comparison Deltas")
+        for reg in report.regression_deltas:
             lines.append(f"- `{reg}`")
     return "\n".join(lines)
 

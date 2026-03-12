@@ -15,6 +15,14 @@ def load_plugin_adapters(specs: list[str] | None = None) -> list[LibraryAdapter]
     return adapters
 
 
+def validate_plugin_specs(specs: list[str]) -> list[dict[str, str]]:
+    validations: list[dict[str, str]] = []
+    for spec in specs:
+        adapter = _load_from_spec(spec)
+        validations.append({"spec": spec, "adapter_name": adapter.name, "status": "ok"})
+    return validations
+
+
 def _load_entrypoint_adapters() -> list[LibraryAdapter]:
     loaded: list[LibraryAdapter] = []
     group_entries = entry_points(group="gil_evaluator.adapters")

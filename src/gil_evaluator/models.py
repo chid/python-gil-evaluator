@@ -64,6 +64,24 @@ class LibraryVerdict:
         payload["compatibility_tier"] = self.compatibility_tier.value
         return payload
 
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> "LibraryVerdict":
+        return cls(
+            library=payload["library"],
+            compatibility_tier=CompatibilityTier(payload["compatibility_tier"]),
+            failure_count=int(payload.get("failure_count", 0)),
+            crash_count=int(payload.get("crash_count", 0)),
+            flaky_case_count=int(payload.get("flaky_case_count", 0)),
+            timeout_count=int(payload.get("timeout_count", 0)),
+            confidence_score=float(payload.get("confidence_score", 0.0)),
+            perf_regression_pct=(
+                float(payload["perf_regression_pct"])
+                if payload.get("perf_regression_pct") is not None
+                else None
+            ),
+            notes=list(payload.get("notes", [])),
+        )
+
 
 @dataclass(slots=True)
 class Report:
@@ -72,12 +90,20 @@ class Report:
     runtimes: list[str]
     perf_threshold_pct: float
     history_regressions: list[dict[str, Any]] = field(default_factory=list)
+    regression_deltas: list[dict[str, Any]] = field(default_factory=list)
+    trend_metrics: dict[str, dict[str, Any]] = field(default_factory=dict)
+    adapter_metadata: dict[str, dict[str, Any]] = field(default_factory=dict)
+    profile: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "runtimes": self.runtimes,
+            "profile": self.profile,
             "perf_threshold_pct": self.perf_threshold_pct,
             "results": [result.to_dict() for result in self.results],
             "verdicts": [verdict.to_dict() for verdict in self.verdicts],
             "history_regressions": self.history_regressions,
+            "regression_deltas": self.regression_deltas,
+            "trend_metrics": self.trend_metrics,
+            "adapter_metadata": self.adapter_metadata,
         }

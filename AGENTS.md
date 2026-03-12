@@ -27,7 +27,10 @@ uv run pytest
 uv run gil-eval --json-out artifacts/gil_eval_report.json
 uv run gil-eval --runtime-exec py312=python3.12,py313t=python3.13t
 uv run gil-eval --libraries-file configs/priority_libraries.txt
+uv run gil-eval --profile priority
 uv run gil-eval --plugin your_pkg.gil_plugins:CustomAdapter
+uv run gil-eval --plugin your_pkg.gil_plugins:CustomAdapter --validate-plugins
+uv run gil-eval --compare-with artifacts/previous_report.json --trend-window 10
 uv run pre-commit install
 uv run pre-commit run --all-files
 ```
@@ -47,6 +50,7 @@ uv sync --extra all
 - Keep `scenario_id` stable to preserve report compatibility.
 - Keep tier logic and heuristics centralized in `scoring.py`.
 - Keep history comparison behavior centralized in `history.py`.
+- Keep explicit report-to-report deltas and trend windows backward-compatible.
 - Prefer plugin adapters for external repos rather than forking core adapters.
 - Avoid non-deterministic tests unless explicitly controlled.
 
